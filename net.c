@@ -8,6 +8,7 @@
 #include <sys/wait.h>
 #include <signal.h>
 #include <errno.h>
+#include <stdio.h>
 
 #define QUEUE_SIZE 50
 

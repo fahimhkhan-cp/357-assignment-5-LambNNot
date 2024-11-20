@@ -64,21 +64,6 @@ struct hostent *gethost(char *hostname)
    return he;
 }
 
-void await_response(int sockfd){
-
-   char response[1024];
-
-   //Read from server
-   int bytes_read = read(sockfd, response, sizeof(response)-1);
-   if(bytes_read < 0){
-      perror("read");
-      exit(1);
-   }
-
-   response[bytes_read]='\0'; //Null-terminate response
-   printf("Response: %s\n", response);
-}
-
 void send_request(int fd)
 {
    char *line = NULL;
@@ -92,8 +77,6 @@ void send_request(int fd)
       }
       printf("Writing...\n");
       write(fd, line, num);
-      printf("Awaiting...\n");
-      await_response(fd);
       printf("Complete\n");
    }
 
