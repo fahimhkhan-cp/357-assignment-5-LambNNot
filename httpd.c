@@ -61,6 +61,15 @@ void handle_request(int nfd){
         return;
     }
 
+    //Parse file name from request
+    char *file_name;
+    while((file_name = strsep(&line," ")) != NULL){
+        if(file_name[0]=='/'){
+            printf("Requested File: %s\n", file_name);
+            break;
+        }
+    }
+
     //Free & Close
     free(line);
     fclose(network);
