@@ -39,28 +39,61 @@ void reply(int clientfd, char* content, int content_length){
 
 }
 
+void response_error(int clientfd, int code){
+    char buffer[64];
+    char error_message[1024];
+    if(code==400){
+        //Bad Request Error
+        sprintf(buffer, "Bad Request");
+    }else if(code==403){
+        //Permission Denied Error
+        sprintf(buffer, "Permission Denied");
+    }else if(code == 404){
+        //Not Found Error
+        sprintf(buffer, "Not Found");
+    }else if(code == 501){
+        //Not Implemented
+        sprintf(buffer, "Not Implemented");
+    }else{
+        //Internal Error (500)
+        sprintf(buffer, "Bad Request");
+    }
+    sprintf(error_message, "<!DOCTYPE html><html><head><h1>ERROR %d:</h1></head><body><p>%s</p></body></html>", code, buffer);
+    reply(clientfd, error_message, sizeof(error_message));
+}
+
 /*Handles GET request*/
 int get_request(char* file_name, int client_fd){
 
     //Check if file exists
     if(access(file_name, F_OK)!=0){
-        fprintf(stderr, "File name not found");
         //Reply w/ ERROR 404
+        fprintf(stderr, "File name not found\n");
+        response_error(client_fd, 404);
         exit(1);
     }
 
     //Open File
     FILE *file = fopen(file_name, "r");
     if(file==NULL){
-        perror("fopen");
+        //Reply w/ ERROR 500
+        fprintf(stderr, "fopen failed\n");
+        response_error(client_fd, 500);
         exit(1);
+    }
+
+    //Check if in cgi-like directory
+    if(strncmp(file_name, "cgi-like", strlen("cgi-like"))==0){
+        printf("CGI-LIKE DETECTED\n");
     }
 
     //Stat file
     printf("FN: %s\n", file_name);
     struct stat status;
     if((stat(file_name, &status))<0){
-        perror("stat");
+        //Reply w/ ERROR 500
+        fprintf(stderr, "stat failed\n");
+        response_error(client_fd, 500);
         exit(1);
     }
 
@@ -87,15 +120,18 @@ int head_request(char* file_name, int client_fd){
 
     //Check if file exists
     if(access(file_name, F_OK)!=0){
-        fprintf(stderr, "File name not found");
         //Reply w/ ERROR 404
+        fprintf(stderr, "File name not found\n");
+        response_error(client_fd, 404);
         exit(1);
     }
 
     //Open File
     FILE *file = fopen(file_name, "r");
     if(file==NULL){
-        perror("fopen");
+        //Reply w/ ERROR 500
+        fprintf(stderr, "fopen failed\n");
+        response_error(client_fd, 500);
         exit(1);
     }
 
@@ -103,7 +139,9 @@ int head_request(char* file_name, int client_fd){
     printf("FN: %s\n", file_name);
     struct stat status;
     if((stat(file_name, &status))<0){
-        perror("stat");
+        //Reply w/ ERROR 500
+        fprintf(stderr, "stat failed\n");
+        response_error(client_fd, 500);
         exit(1);
     }
 
@@ -132,7 +170,9 @@ void handle_request(int nfd){
     //Open socket in buffer
     FILE *network = fdopen(nfd, "r+");
     if (network == NULL){
-        perror("fdopen");
+        //Reply w/ ERROR 500
+        fprintf(stderr, "stat failed\n");
+        response_error(nfd, 500);
         exit(1);
     }
 
@@ -143,11 +183,11 @@ void handle_request(int nfd){
     ssize_t num;            //Stores bytes read
     num = getline(&line, &size, network); //Read one line from socket (client)
 
-    //TODO: Add Handling logic
     char request;           //Stores the request type
     if((request= validate_request(line, num)) == 'E'){
-        fprintf(stderr, "Request type not supported\n");
         //TODO: Reply w/ ERROR 501
+        fprintf(stderr, "Request type not supported\n");
+        response_error(nfd, 501);
         exit(1);
     }
 
@@ -157,8 +197,9 @@ void handle_request(int nfd){
         if(file_name[0]=='/'){
             //Check for inappropriate files
             if(file_name[1] == '.'){
-                fprintf(stderr, "No perms\n");
                 //Reply with ERROR 403
+                fprintf(stderr, "No perms\n");
+                response_error(nfd, 403);
                 exit(1);
             }
             printf("Requested File: %s\n", ++file_name); //Increment pointer to get rid of "/" in file_name, which breaks shit otherwise
@@ -168,7 +209,17 @@ void handle_request(int nfd){
     if(file_name==NULL){
         //Reply w/ Error 400
         fprintf(stderr, "Bad Req\n");
+        response_error(nfd, 400);
         exit(1);
+    }
+
+    //Null-terminate file_name properly if last character is '\n'
+    size_t length;
+    length = strlen(file_name);
+    if(file_name[length-1] == '\n'){
+        file_name[length-1] = '\0';
+    }else{
+        file_name[length] = '\0';
     }
 
     //Check for favicon.ico specifically (It auto-requests for it idk)
