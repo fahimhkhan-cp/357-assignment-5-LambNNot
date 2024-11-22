@@ -64,6 +64,23 @@ struct hostent *gethost(char *hostname)
    return he;
 }
 
+/*Read response from server*/
+void await_response(int sockfd){
+
+   FILE *socket = fdopen(sockfd, "r");
+
+   //Read through socket
+   char* line;
+   size_t size;
+   ssize_t num;
+   while((num = getline(&line, &size, socket)) >= 0){
+      printf("%s", line);
+   }
+
+   free(line);
+   fclose(socket);
+}
+
 void send_request(int fd)
 {
    char *line = NULL;
@@ -94,8 +111,8 @@ int main(int argc, char *argv[])
       if (fd != -1)
       {
          send_request(fd);
-         close(fd);
       }
+      close(fd);
    }
 
    return 0;

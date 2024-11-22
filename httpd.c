@@ -4,6 +4,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 #include "net.h"
 
 /*Returns 0 if good, 1 if bad*/
@@ -22,21 +24,107 @@ int validate_arguments(int argc, char* argv[]){
 }
 
 /*Replies to client*/
-void reply(int clientfd, int msg_size){
-   //Write to client
+void reply(int clientfd, char* content, int content_length){
+    //Write 
+    dprintf(clientfd, "HTTP/1.0 200 OK\r\n");
+    dprintf(clientfd, "Content-Type: text/html\r\n");
+    dprintf(clientfd, "Content-Length: %d\r\n", content_length);
+    dprintf(clientfd, "\r\n");
+
+    //Write to client
+    printf("%s", content);
+    if(content!=NULL){
+        write(clientfd, content, content_length);
+    }
 
 }
 
-int validate_request(char* line, int num){
+/*Handles GET request*/
+int get_request(char* file_name, int client_fd){
+
+    //Check if file exists
+    if(access(file_name, F_OK)!=0){
+        fprintf(stderr, "File name not found");
+        //Reply w/ ERROR 404
+        exit(1);
+    }
+
+    //Open File
+    FILE *file = fopen(file_name, "r");
+    if(file==NULL){
+        perror("fopen");
+        exit(1);
+    }
+
+    //Stat file
+    printf("FN: %s\n", file_name);
+    struct stat status;
+    if((stat(file_name, &status))<0){
+        perror("stat");
+        exit(1);
+    }
+
+    //Read file & Store in content
+    char content[1024] = {0};
+    int content_length;
+    char* line = NULL;
+    size_t size = 0;
+    ssize_t num;
+    while((num = getline(&line, &size, file)) != EOF){
+        content_length += num;
+        strcat(content, line);
+    }
+    reply(client_fd, content, content_length);
+
+    //Free & Close
+    free(line);
+    fclose(file);
+    return 0;
+}
+
+/*Handles HEAD request*/
+int head_request(char* file_name, int client_fd){
+
+    //Check if file exists
+    if(access(file_name, F_OK)!=0){
+        fprintf(stderr, "File name not found");
+        //Reply w/ ERROR 404
+        exit(1);
+    }
+
+    //Open File
+    FILE *file = fopen(file_name, "r");
+    if(file==NULL){
+        perror("fopen");
+        exit(1);
+    }
+
+    //Stat file
+    printf("FN: %s\n", file_name);
+    struct stat status;
+    if((stat(file_name, &status))<0){
+        perror("stat");
+        exit(1);
+    }
+
+    //Reply to client
+    reply(client_fd, NULL, 0);
+    
+    return 0;
+}
+
+/*Returns G on GET, H on HEAD, E if invalid */
+char validate_request(char* line, int num){
     if(strncmp(line, "GET", 3)==0){ 
         printf("GET Request Detected\n");
+        return 'G';
     }
     else if(strncmp(line, "HEAD", 4)==0){
         printf("HEAD Request Detected\n");
+        return 'H';
     }else{
-        return 1;
+        return 'E';
     }
-    return 0;
 }
 
 /*Handles request from client*/
@@ -45,33 +133,57 @@ void handle_request(int nfd){
     FILE *network = fdopen(nfd, "r+");
     if (network == NULL){
         perror("fdopen");
-        close(nfd);
-        return;
+        exit(1);
     }
 
     //Read from client
     char *line = NULL;      //Stores line read from socket
-    size_t size;            //Allocated size of line
+    char *line_cpy = line;  //Used to store original pointer location bc strsep is problematic
+    size_t size = 0;        //Allocated size of line
     ssize_t num;            //Stores bytes read
     num = getline(&line, &size, network); //Read one line from socket (client)
 
     //TODO: Add Handling logic
-    if(validate_request(line, num)){
-        perror("Request type not supported\n");
-        return;
+    char request;           //Stores the request type
+    if((request= validate_request(line, num)) == 'E'){
+        fprintf(stderr, "Request type not supported\n");
+        //TODO: Reply w/ ERROR 501
+        exit(1);
     }
 
     //Parse file name from request
     char *file_name;
     while((file_name = strsep(&line," ")) != NULL){
         if(file_name[0]=='/'){
-            printf("Requested File: %s\n", file_name);
+            //Check for inappropriate files
+            if(file_name[1] == '.'){
+                fprintf(stderr, "No perms\n");
+                //Reply with ERROR 403
+                exit(1);
+            }
+            printf("Requested File: %s\n", ++file_name); //Increment pointer to get rid of "/" in file_name, which breaks shit otherwise
             break;
+        }
+    }
+    if(file_name==NULL){
+        //Reply w/ Error 400
+        fprintf(stderr, "Bad Req\n");
+        exit(1);
+    }
+
+    //Check for favicon.ico specifically (It auto-requests for it idk)
+    if((strcmp(file_name, "favicon.ico"))!=0){
+        if(request == 'G'){
+            //GET Request Handling
+            get_request(file_name, nfd);
+        }else{
+            //HEAD Request Handling
+            head_request(file_name, nfd);
         }
     }
 
     //Free & Close
-    free(line);
+    free(line_cpy);
     fclose(network);
 }
 
@@ -92,13 +204,8 @@ int main(int argc, char* argv[]){
         return 1;
     }
     short port = atoi(argv[1]);
-
-    printf("%d\n", port);
-
-    printf("t\n");
     //Initialize server
     int server_fd = create_service(port);
-    printf("t\n");
     if(server_fd == -1){
         perror("create_service");
         exit(1);
