@@ -40,8 +40,8 @@ void reply(int clientfd, char* content, int content_length){
 }
 
 void response_error(int clientfd, int code){
-    char buffer[64];
-    char error_message[1024];
+    char buffer[64] = {0};
+    char error_message[1024] ={0};
     if(code==400){
         //Bad Request Error
         sprintf(buffer, "Bad Request");
@@ -59,7 +59,7 @@ void response_error(int clientfd, int code){
         sprintf(buffer, "Bad Request");
     }
     sprintf(error_message, "<!DOCTYPE html><html><head><h1>ERROR %d:</h1></head><body><p>%s</p></body></html>", code, buffer);
-    reply(clientfd, error_message, sizeof(error_message));
+    reply(clientfd, error_message, strlen(error_message));
 }
 
 /*Handles GET request*/
@@ -99,15 +99,13 @@ int get_request(char* file_name, int client_fd){
 
     //Read file & Store in content
     char content[1024] = {0};
-    int content_length;
     char* line = NULL;
     size_t size = 0;
     ssize_t num;
     while((num = getline(&line, &size, file)) != EOF){
-        content_length += num;
         strcat(content, line);
     }
-    reply(client_fd, content, content_length);
+    reply(client_fd, content, strlen(content));
 
     //Free & Close
     free(line);
@@ -178,10 +176,10 @@ void handle_request(int nfd){
 
     //Read from client
     char *line = NULL;      //Stores line read from socket
-    char *line_cpy = line;  //Used to store original pointer location bc strsep is problematic
     size_t size = 0;        //Allocated size of line
     ssize_t num;            //Stores bytes read
     num = getline(&line, &size, network); //Read one line from socket (client)
+    char *line_cpy = line;  //Used to store original pointer location bc strsep is problematic
 
     char request;           //Stores the request type
     if((request= validate_request(line, num)) == 'E'){

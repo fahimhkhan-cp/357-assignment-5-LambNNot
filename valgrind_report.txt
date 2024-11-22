@@ -1,0 +1,36 @@
+valgrind --leak-check=yes ./httpd 6969
+==10277== Memcheck, a memory error detector
+==10277== Copyright (C) 2002-2017, and GNU GPL'd, by Julian Seward et al.
+==10277== Using Valgrind-3.15.0 and LibVEX; rerun with -h for copyright info
+==10277== Command: ./httpd 6969
+==10277== 
+Listening on port: 6969
+Connection established
+GET Request Detected
+Requested File: cgi-like/index.html
+CGI-LIKE DETECTED
+FN: cgi-like/index.html
+<!DOCTYPE html>
+<html>
+<head>
+</head>
+    <body>
+        <h1>I hate this.</h1>
+        <p>bruh</p>
+    </body>
+</html>Connection closed
+^C==10277== 
+==10277== Process terminating with default action of signal 2 (SIGINT)
+==10277==    at 0x4F36690: __accept_nocancel (in /usr/lib64/libc-2.17.so)
+==10277==    by 0x401851: accept_connection (in /home/sphan20/github-classroom/fahimhkhan-cp/357-assignment-5-LambNNot/httpd)
+==10277==    by 0x401674: run_service (in /home/sphan20/github-classroom/fahimhkhan-cp/357-assignment-5-LambNNot/httpd)
+==10277==    by 0x401728: main (in /home/sphan20/github-classroom/fahimhkhan-cp/357-assignment-5-LambNNot/httpd)
+==10277== 
+==10277== HEAP SUMMARY:
+==10277==     in use at exit: 0 bytes in 0 blocks
+==10277==   total heap usage: 4 allocs, 4 frees, 1,376 bytes allocated
+==10277== 
+==10277== All heap blocks were freed -- no leaks are possible
+==10277== 
+==10277== For lists of detected and suppressed errors, rerun with: -s
+==10277== ERROR SUMMARY: 0 errors from 0 contexts (suppressed: 0 from 0)
